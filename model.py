@@ -8,15 +8,35 @@ import random
 FANS = ((290, 512), (409, 455), (787, 455), (923, 514), (831, 600), (364, 601))
 TARGET = (600, 501)
 ITEMS = ("Бумажный мяч", "Стаканчик", "Губка")
-TAUNTS = (
-    "Тики-така? Лови стакан!",
-    "Камп Ноу в другой стороне!",
-    "Эй, растяпа, лови!",
-    "Барса, где твоя защита?",
-    "Шарф крутой. Счёт — не очень!",
-    "Мадрид передаёт привет!",
+@dataclass(frozen=True)
+class Club:
+    name: str
+    badge: str
+    primary: tuple[int, int, int]
+    secondary: tuple[int, int, int]
+
+
+CLUBS = (
+    Club("Барселона", "FCB", (54, 90, 153), (167, 52, 83)),
+    Club("Реал Мадрид", "RM", (250, 250, 244), (168, 151, 205)),
+    Club("Атлетико Мадрид", "ATM", (225, 58, 65), (250, 250, 244)),
+    Club("Севилья", "SEV", (250, 250, 244), (206, 45, 58)),
+    Club("Реал Бетис", "BET", (36, 151, 91), (250, 250, 244)),
+    Club("Валенсия", "VAL", (250, 250, 244), (235, 130, 47)),
+    Club("Вильярреал", "VIL", (246, 216, 62), (62, 92, 158)),
+    Club("Атлетик Бильбао", "ATH", (212, 52, 59), (250, 250, 244)),
+    Club("Реал Сосьедад", "RSO", (54, 111, 186), (250, 250, 244)),
+    Club("Жирона", "GIR", (218, 53, 65), (250, 250, 244)),
 )
-REPLIES = ("Зато у нас тики-така!", "Судья! Это фол!", "Я вообще-то на матч!", "Ещё увидимся в класико!")
+TAUNTS = (
+    "Эй, лови стакан!",
+    "{target}, где твоя защита?",
+    "Эй, растяпа, лови!",
+    "{throwers} передаёт привет!",
+    "Шарф крутой. Счёт — не очень!",
+    "До встречи на поле!",
+)
+REPLIES = ("Наши ещё покажут!", "Судья! Это фол!", "Я вообще-то на матч!", "Ещё увидимся на поле!")
 
 
 @dataclass
@@ -55,6 +75,8 @@ class GameState:
 
     def __init__(self, seed=None):
         self.rng = random.Random(seed)
+        self.throwers = 0
+        self.target = 1
         self.reset()
 
     def reset(self):
@@ -74,6 +96,19 @@ class GameState:
         self.reply_time = 0.0
         self.last_kind = 0
 
+    def choose_club(self, role, index):
+        """Change a side, swapping opponents if necessary, and start a fresh round."""
+        if role not in ("throwers", "target") or index not in range(len(CLUBS)):
+            return False
+        if getattr(self, role) == index:
+            return False
+        other = "target" if role == "throwers" else "throwers"
+        if getattr(self, other) == index:
+            setattr(self, other, getattr(self, role))
+        setattr(self, role, index)
+        self.reset()
+        return True
+
     def select(self, kind):
         if kind in range(len(ITEMS)):
             self.selected = kind
@@ -92,6 +127,7 @@ class GameState:
         ))
         self.poses[self.speaker] = 0.5
         self.bubble = TAUNTS[0] if self.selected == 1 else self.rng.choice(TAUNTS[1:])
+        self.bubble = self.bubble.format(target=CLUBS[self.target].name, throwers=CLUBS[self.throwers].name)
         self.bubble_time = 2.4
         self.throws += 1
         self.cooldown = self.cooldown_seconds

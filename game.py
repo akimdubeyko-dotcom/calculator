@@ -11,7 +11,7 @@ import sys
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame
 
-from model import FANS, ITEMS, GameState
+from model import CLUBS, FANS, ITEMS, GameState
 
 
 WIDTH, HEIGHT = 1200, 800
@@ -24,6 +24,11 @@ CORAL = (234, 115, 85)
 BLUE = (54, 90, 153)
 MAROON = (167, 52, 83)
 BUTTON = pygame.Rect(824, 692, 336, 64)
+TEAM_BUTTON = pygame.Rect(40, 112, 800, 36)
+TEAM_DONE = pygame.Rect(450, 697, 300, 48)
+TEAM_CHOICES = [(role, i, pygame.Rect(x, 175 + i * 49, 420, 43))
+                for role, x in (("throwers", 160), ("target", 620))
+                for i in range(len(CLUBS))]
 ITEM_RECTS = [pygame.Rect(40 + i * 202, 692, 190, 64) for i in range(3)]
 
 
@@ -131,6 +136,7 @@ class Game:
         self.state = GameState(seed)
         self.sound = Sound()
         self.running = True
+        self.team_menu = False
         self.background = self.make_background()
 
     def make_background(self):
@@ -158,7 +164,7 @@ class Game:
         for x in range(193, 1000, 40):
             line(surface, (242, 240, 224), (x, 282), (x, 408), 4)
         round_rect(surface, INK, (431, 220, 338, 44), 10)
-        self.text.draw(surface, "MADRID  /  DÍA DE PARTIDO", (600, 242), 18, WHITE, True, True)
+        self.text.draw(surface, "ESPAÑA  /  DÍA DE PARTIDO", (600, 242), 18, WHITE, True, True)
         for x in (254, 463, 674, 875):
             round_rect(surface, (96, 119, 120), (x, 347, 73, 87), 29)
             pygame.draw.rect(surface, (96, 119, 120), (x, 386, 73, 48))
@@ -222,15 +228,12 @@ class Game:
             pygame.draw.lines(sprite, skin, False, [shoulder, elbow, hand], 7)
             pygame.draw.circle(sprite, skin, hand, 6)
         round_rect(sprite, INK, (34, 62, 52, 55), 12)
-        round_rect(sprite, BLUE if hero else WHITE, (37, 65, 46, 48), 9)
-        if hero:
-            for sx in (44, 64):
-                pygame.draw.rect(sprite, MAROON, (sx, 66, 9, 44))
-            self.text.draw(sprite, "FCB", (60, 89), 12, (255, 223, 112), True, True)
-        else:
-            line(sprite, (168, 151, 205), (40, 71), (77, 101), 6)
-            self.text.draw(sprite, "RM", (61, 84), 12, INK, True, True)
-            pygame.draw.circle(sprite, (218, 183, 99), (73, 71), 3)
+        club = CLUBS[state.target if hero else state.throwers]
+        round_rect(sprite, club.primary, (37, 65, 46, 48), 9)
+        for sx in (44, 64):
+            pygame.draw.rect(sprite, club.secondary, (sx, 66, 9, 44))
+        round_rect(sprite, INK, (43, 78, 35, 19), 4)
+        self.text.draw(sprite, club.badge, (60, 87), 10, WHITE, True, True)
         pygame.draw.circle(sprite, INK, (60, 40), 25)
         pygame.draw.circle(sprite, skin, (60, 40), 22)
         pygame.draw.circle(sprite, skin, (36, 43), 5)
@@ -246,17 +249,17 @@ class Game:
                 pygame.draw.circle(sprite, INK, (ex, 41), 2)
             pygame.draw.arc(sprite, INK, (52, 44, 17, 12), math.pi, math.tau, 2)
         if hero:
-            # The unmistakable blue-and-garnet scarf.
-            round_rect(sprite, (236, 183, 91), (35, 60, 50, 9), 4)
-            pygame.draw.rect(sprite, MAROON, (37, 62, 46, 5))
-            pygame.draw.rect(sprite, BLUE, (75, 65, 10, 30))
+            # Scarf follows the selected club colors.
+            round_rect(sprite, club.primary, (35, 60, 50, 9), 4)
+            pygame.draw.rect(sprite, club.secondary, (37, 62, 46, 5))
+            pygame.draw.rect(sprite, club.primary, (75, 65, 10, 30))
             for sy in range(67, 94, 8):
-                pygame.draw.rect(sprite, MAROON, (75, sy, 10, 4))
+                pygame.draw.rect(sprite, club.secondary, (75, sy, 10, 4))
         else:
             # Caps in white and purple, different on each fan.
             if index % 2 == 0:
-                pygame.draw.arc(sprite, WHITE, (35, 9, 50, 33), 0, math.pi, 12)
-                line(sprite, (168, 151, 205), (32, 28), (80, 28), 5)
+                pygame.draw.arc(sprite, club.primary, (35, 9, 50, 33), 0, math.pi, 12)
+                line(sprite, club.secondary, (32, 28), (80, 28), 5)
         shadow_width = 69 if hero else 60
         pygame.draw.ellipse(self.canvas, (182, 187, 165), (x-shadow_width/2, y-5, shadow_width, 13))
         angle = math.sin(state.time*44) * state.reaction * 16 if reacting else 0
@@ -288,7 +291,10 @@ class Game:
         ball(self.canvas, (53, 40), 12)
         self.text.draw(self.canvas, "ДВОРОВОЕ КЛАСИКО", (75, 27), 16, INK, True)
         self.text.draw(self.canvas, "ДЕРБИ У СТАДИОНА", (37, 60), 43, INK, True)
-        self.text.draw(self.canvas, "Один сине-гранатовый шарф. Целая компания в белом.", (40, 120), 18, MUTED)
+        round_rect(self.canvas, (229, 237, 231), TEAM_BUTTON, 10)
+        matchup = f"Кидают: {CLUBS[state.throwers].name}  /  В центре: {CLUBS[state.target].name}"
+        self.text.draw(self.canvas, matchup, (52, 122), 13, INK, True)
+        self.text.draw(self.canvas, "Команды [T]", (716, 121), 13, BLUE, True)
         for x, value, caption in [(936, f"{state.throws:02}", "БРОСКИ"), (1080, f"{state.hits:02}", "ПОПАДАНИЯ")]:
             round_rect(self.canvas, (234, 234, 224), (x-69, 28, 137, 105), 18)
             self.text.draw(self.canvas, value, (x, 65), 33, INK, True, True)
@@ -347,7 +353,30 @@ class Game:
         self.text.draw(self.canvas, "1–3  предмет     R  заново     Esc  выход", (40, 772), 12, MUTED)
         sound_label = "нет аудиоустройства" if not self.sound.available else ("вкл" if self.sound.enabled else "выкл")
         self.text.draw(self.canvas, f"M  звук: {sound_label}", (825, 772), 12, MUTED)
+        if self.team_menu:
+            self.draw_team_menu()
         self.present()
+
+    def draw_team_menu(self):
+        shade = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        shade.fill((20, 30, 40, 180))
+        self.canvas.blit(shade, (0, 0))
+        round_rect(self.canvas, PAPER, (120, 44, 960, 720), 24)
+        self.text.draw(self.canvas, "ВЫБЕРИ КОМАНДЫ", (600, 80), 30, INK, True, True)
+        self.text.draw(self.canvas, "КТО КИДАЕТ", (370, 137), 18, INK, True, True)
+        self.text.draw(self.canvas, "ФАНАТ В ЦЕНТРЕ", (830, 137), 18, INK, True, True)
+        for role, index, rect in TEAM_CHOICES:
+            club = CLUBS[index]
+            selected = getattr(self.state, role) == index
+            round_rect(self.canvas, INK if selected else (234, 234, 224), rect, 9)
+            round_rect(self.canvas, club.primary, (rect.x+12, rect.y+10, 24, 24), 5)
+            pygame.draw.rect(self.canvas, club.secondary, (rect.x+22, rect.y+10, 7, 24))
+            self.text.draw(self.canvas, club.name, (rect.x+48, rect.y+10), 17, WHITE if selected else INK, selected)
+            if selected:
+                pygame.draw.lines(self.canvas, MINT, False, [(rect.right-29, rect.y+22), (rect.right-24, rect.y+27), (rect.right-15, rect.y+16)], 3)
+        self.text.draw(self.canvas, "Один клуб на обеих сторонах? Команды поменяются местами.", (600, 677), 14, MUTED, center=True)
+        round_rect(self.canvas, CORAL, TEAM_DONE, 12)
+        self.text.draw(self.canvas, "ИГРАТЬ  /  Enter", TEAM_DONE.center, 18, INK, True, True)
 
     def viewport(self):
         width, height = self.window.get_size()
@@ -377,6 +406,13 @@ class Game:
         if event.type == pygame.QUIT:
             self.running = False
         elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_t:
+                self.team_menu = not self.team_menu
+                return
+            if self.team_menu:
+                if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+                    self.team_menu = False
+                return
             if event.key == pygame.K_ESCAPE:
                 self.running = False
             elif event.key == pygame.K_SPACE:
@@ -389,6 +425,17 @@ class Game:
                 self.sound.toggle()
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             pos = self.logical_mouse(event.pos)
+            if self.team_menu:
+                if TEAM_DONE.collidepoint(pos):
+                    self.team_menu = False
+                else:
+                    for role, index, rect in TEAM_CHOICES:
+                        if rect.collidepoint(pos):
+                            self.state.choose_club(role, index)
+                return
+            if TEAM_BUTTON.collidepoint(pos):
+                self.team_menu = True
+                return
             if BUTTON.collidepoint(pos):
                 self.throw()
             for i, rect in enumerate(ITEM_RECTS):
@@ -400,7 +447,7 @@ class Game:
     def step(self, dt):
         for event in pygame.event.get():
             self.handle_event(event)
-        if self.state.update(dt):
+        if not self.team_menu and self.state.update(dt):
             self.sound.play("hit")
         self.draw()
 
